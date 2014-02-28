@@ -1,31 +1,33 @@
 === WordPress Front-end Editor ===
 
-Contributors: avryl, wordpressdotorg, Joen, shaunandrews, kraftbj
+Contributors: avryl, wordpressdotorg
 Tags: front-end editor, inline editing
 Requires at least: 3.8
-Tested up to: 3.8.1
-Stable tag: 0.8.4
+Tested up to: 3.9
+Stable tag: 0.8.5
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
 == Description ==
 
-If you found a bug or if you have ideas, add them to [the plugins Trac](https://plugins.trac.wordpress.org/plugin/wp-front-end-editor). We’ll also keep a list of tasks there.
+If you found a bug or if you have ideas, add them to [the GitHub issue tracker](https://github.com/avryl/wp-front-end-editor/issues/new). We’ll also keep a list of tasks there.
 
-**Weekly IRC Chat:** Tuesdays, 17:00 UTC, #wordpress-ui
+**Weekly IRC Chat:** Tuesdays, 17:00 UTC, [#wordpress-ui](http://codex.wordpress.org/IRC).
 
+If you'd like to join our Skype chat, add jannekevandorpe and mention this plugin.
+
+[WordPress Plugin](http://wordpress.org/plugins/wp-front-end-editor/)  
+[GitHub](https://github.com/avryl/wp-front-end-editor)  
 [Features as Plugins Tracking](http://make.wordpress.org/core/features-as-plugins/)  
-[Make WordPress UI Posts](http://make.wordpress.org/ui/tag/front-end-editor/)  
-[GitHub Mirror](https://github.com/avryl/wp-front-end-editor)  
-[Trac](https://plugins.trac.wordpress.org/plugin/wp-front-end-editor)
-
-We're still looking for more people to join us - developers, UI designers and users/testers for feedback. Please get in touch on IRC or leave a comment on one of the [Make WordPress UI](http://make.wordpress.org/ui/tag/front-end-editor/) blog posts.
-
-== Installation ==
-
-This is just an experiment!
+[Make WordPress UI Posts](http://make.wordpress.org/ui/tag/front-end-editor/)
 
 == Changelog ==
+
+= 0.8.5 =
+
+* Support post locking.
+* Support more and nextpage tags.
+* Escape all html comments in the post content.
 
 = 0.8.4 =
 

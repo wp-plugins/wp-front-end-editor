@@ -1,3 +1,4 @@
+/* global wpFee, tinymce, setPostThumbnailL10n, autosaveL10n, wpCookies, alert  */
 ( function( $, globals, window ) {
 	'use strict';
 	var frame;
@@ -40,10 +41,10 @@
 						'shortcode': content
 					};
 				$.post( wp.fee.ajaxUrl, data, function( data ) {
-					tinyMCE.activeEditor.insertContent( data );
+					tinymce.activeEditor.insertContent( data );
 				} );
 			} else {
-				tinyMCE.activeEditor.insertContent( content );
+				tinymce.activeEditor.insertContent( content );
 			}
 		},
 		removeToolbarStyles: function() {
@@ -76,8 +77,8 @@
 			} );
 		},
 		onbeforeunload: function() {
-			if ( tinyMCE.get( 'wp-fee-content-' + wp.fee.post.id() ).isDirty() )
-			    return autosaveL10n.saveAlert;
+			if ( tinymce.get( 'wp-fee-content-' + wp.fee.post.id() ).isDirty() )
+				return autosaveL10n.saveAlert;
 		},
 		post: {
 			id: function() {
@@ -90,11 +91,11 @@
 				var content;
 				if ( typeof tinymce !== 'undefined' ) {
 					if ( type === 'raw' ) {
-						content = tinyMCE.get( 'wp-fee-content-' + wp.fee.post.id() ).getContent( {
+						content = tinymce.get( 'wp-fee-content-' + wp.fee.post.id() ).getContent( {
 							format: 'raw'
 						} );
 					} else {
-						content = tinyMCE.get( 'wp-fee-content-' + wp.fee.post.id() ).getContent();
+						content = tinymce.get( 'wp-fee-content-' + wp.fee.post.id() ).getContent();
 						content = $( '<div>' + content + '</div>' );
 						content.find( '.wp-fee-shortcode' )
 							.each( function() {
@@ -185,11 +186,12 @@
 			$( this ).parents( '.wp-fee-shortcode-container' ).remove();
 		} )
 		.on( 'click', '.wp-fee-shortcode-edit', function() {
-			var container = $( this ).parents( '.wp-fee-shortcode-container' );
+			var container = $( this ).parents( '.wp-fee-shortcode-container' ),
+				shortcode, gallery, img, id;
 			switch ( $( this ).data( 'kind' ) ) {
 				case 'gallery':
-					var shortcode = container.children( '.wp-fee-shortcode' ).html(),
-						gallery = wp.media.gallery;
+					shortcode = container.children( '.wp-fee-shortcode' ).html();
+					gallery = wp.media.gallery;
 					gallery.edit( shortcode ).state('gallery-edit')
 						.on( 'update', function( selection ) {
 							shortcode = gallery.shortcode( selection ).string();
@@ -197,8 +199,8 @@
 						} );
 					break;
 				case 'caption':
-					var img = container.find( 'img' ).attr( 'class' ),
-						id = img.match( /wp-image-([\d]*)/i )[1];
+					img = container.find( 'img' ).attr( 'class' );
+					id = img.match( /wp-image-([\d]*)/i )[1];
 					if ( frame ) {
 						frame.open();
 					} else {
@@ -217,10 +219,11 @@
 								selection.add( attachment ? [ attachment ] : [] );
 							} )
 							.on( 'insert', function() {
-								var selection = frame.state().get( 'selection' ).first();
+								var selection = frame.state().get( 'selection' ).first(),
+									display;
 								if ( ! selection )
 									return;
-								var display = frame.state().display( selection ).toJSON();
+								display = frame.state().display( selection ).toJSON();
 								wp.media.editor.send.attachment( display, selection.toJSON() )
 									.done( function() {
 										wp.fee.convertReplace( arguments[0], container );
@@ -247,12 +250,12 @@
 			event.preventDefault();
 		} )
 		.ready( function() {
-			var content = $( '#wp-fee-content-' + wp.fee.post.id() ),
-				postBody = $( '.wp-fee-post' ),
+			var postBody = $( '.wp-fee-post' ),
 				title = false,
-				title1, title2, title3, title4, title5;
+				title1, title2, title3, title4, title5, docTitle, postFormat;
 			
 			$( '#message' ).delay( 5000 ).fadeOut( 'slow' );
+			$( '.notification-dialog-wrap' ).addClass( 'wp-core-ui' );
 			
 			// Most likely case and safest bet.
 			if ( ( title1 = $( '.wp-fee-post .entry-title' ) ) && postBody.length && postBody.hasClass( 'post-' + wp.fee.post.id() ) && title1.length ) {
@@ -288,7 +291,7 @@
 
 			if ( wp.fee.title ) {
 
-				var docTitle = ( wp.fee.title.text().length ? document.title.replace( wp.fee.title.text(), '<!--replace-->' ) : document.title );
+				docTitle = ( wp.fee.title.text().length ? document.title.replace( wp.fee.title.text(), '<!--replace-->' ) : document.title );
 
 				wp.fee.title.text( wp.fee.post.title() ).attr( 'contenteditable', 'true' ).addClass( 'wp-fee-title' )
 					.on( 'keyup', function() {
@@ -307,11 +310,11 @@
 					} );
 			}
 
-			tinyMCE.init( {
+			tinymce.init( {
 				selector: '#wp-fee-content-' + wp.fee.post.id(),
 				inline: true,
 				plugins: 'wpfeelink charmap paste textcolor table noneditable',
-				toolbar1: 'kitchensink formatselect bold italic underline strikethrough blockquote alignleft aligncenter alignright alignjustify link media undo redo',
+				toolbar1: 'kitchensink formatselect bold italic underline strikethrough blockquote alignleft aligncenter alignright alignjustify wp_more link media undo redo',
 				toolbar2: 'kitchensink removeformat pastetext bullist numlist outdent indent forecolor backcolor table undo redo',
 				menubar: false,
 				fixed_toolbar_container: '#wp-admin-bar-wp-fee-mce-toolbar',
@@ -322,7 +325,7 @@
 				valid_elements: '*[*]',
 				valid_children : '+div[style],+div[script]',
 				setup: function( editor ) {
-					editor.on( 'init', function(e) {
+					editor.on( 'init', function() {
 						editor.focus();
 						$( '.mce-i-media' ).parent()
 							.data( 'editor', 'fee-edit-content-' + wp.fee.post.id() )
@@ -359,6 +362,142 @@
 								$( 'p.wp-fee-content-placeholder' ).show();
 							}
 						} );
+					// Replace Read More/Next Page tags with images
+					editor.on( 'BeforeSetContent', function( e ) {
+						if ( e.content ) {
+							if ( e.content.indexOf( '<!--more' ) !== -1 ) {
+								e.content = e.content.replace( /<!--more(.*?)-->/g, function( match, moretext ) {
+									return '<img src="' + tinymce.Env.transparentSrc + '" data-wp-more="' + moretext + '" ' +
+										'class="wp-more-tag mce-wp-more" title="Read More..." data-mce-resize="false" data-mce-placeholder="1" />';
+								});
+							}
+
+							if ( e.content.indexOf( '<!--nextpage-->' ) !== -1 ) {
+								e.content = e.content.replace( /<!--nextpage-->/g,
+									'<img src="' + tinymce.Env.transparentSrc + '" class="wp-more-tag mce-wp-nextpage" ' +
+										'title="Page break" data-mce-resize="false" data-mce-placeholder="1" />' );
+							}
+							e.content = e.content.replace( /<!--(.*?)-->/g, '&lt;!--$1--&gt;' );
+						}
+					});
+					// Replace images with tags
+					editor.on( 'PostProcess', function( e ) {
+						if ( e.get ) {
+							e.content = e.content.replace(/<img[^>]+>/g, function( image ) {
+								var match, moretext = '';
+
+								if ( image.indexOf('wp-more-tag') !== -1 ) {
+									if ( image.indexOf('mce-wp-more') !== -1 ) {
+										if ( match = image.match( /data-wp-more="([^"]+)"/ ) ) {
+											moretext = match[1];
+										}
+										image = '<!--more' + moretext + '-->';
+									} else if ( image.indexOf('mce-wp-nextpage') !== -1 ) {
+										image = '<!--nextpage-->';
+									}
+								}
+
+								return image;
+							});
+							e.content = e.content.replace( /&lt;!--(.*?)--&gt;/g, '<!--$1-->' );
+						}
+					});
+
+					// Display the tag name instead of img in element path
+					editor.on( 'ResolveName', function( e ) {
+						var dom = editor.dom,
+							target = e.target;
+
+						if ( target.nodeName === 'IMG' && dom.hasClass( target, 'wp-more-tag' ) ) {
+							if ( dom.hasClass( target, 'mce-wp-more' ) ) {
+								e.name = 'more';
+							} else if ( dom.hasClass( target, 'mce-wp-nextpage' ) ) {
+								e.name = 'nextpage';
+							}
+						}
+					});
+
+					// Make sure the "more" tag is in a separate paragraph
+					editor.on( 'PreProcess', function( event ) {
+						var more;
+
+						if ( event.save ) {
+							more = editor.dom.select( 'img.wp-more-tag', event.node );
+
+							if ( more.length ) {
+								tinymce.each( more, function( node ) {
+									var parent = node.parentNode, p;
+
+									if ( parent.nodeName === 'P' && parent.childNodes.length > 1 ) {
+										p = editor.dom.create('p');
+										parent.parentNode.insertBefore( p, parent );
+										p.appendChild( node );
+									}
+								});
+							}
+						}
+					});
+
+					// Register commands
+					editor.addCommand( 'WP_More', function( tag ) {
+						var parent, html, title, p1, p2,
+							classname = 'wp-more-tag',
+							spacer = tinymce.Env.ie ? '' : '<br data-mce-bogus="1" />',
+							dom = editor.dom,
+							node = editor.selection.getNode();
+
+						tag = tag || 'more';
+						classname += ' mce-wp-' + tag;
+						title = tag === 'more' ? 'More...' : 'Next Page';
+						html = '<img src="' + tinymce.Env.transparentSrc + '" title="' + title + '" class="' + classname + '" ' +
+							'data-mce-resize="false" data-mce-placeholder="1" />';
+
+						if ( dom.hasClass( node, 'mce-content-body' ) ) {
+							editor.insertContent( '<p>' + html + '</p><p></p>' );
+							return;
+						}
+
+						// Get the top level parent node
+						parent = dom.getParent( node, function( found ) {
+							if ( found.parentNode && dom.hasClass( found.parentNode, 'mce-content-body' ) ) {
+								return true;
+							}
+
+							return false;
+						}, editor.getBody() );
+
+						if ( parent ) {
+							p1 = dom.create( 'p', null, html );
+							dom.insertAfter( p1, parent );
+
+							if ( ! ( p2 = p1.nextSibling ) ) {
+								p2 = dom.create( 'p', null, spacer );
+								dom.insertAfter( p2, p1 );
+							}
+
+							editor.nodeChanged();
+							editor.selection.setCursorLocation( p2, 0 );
+						}
+					});
+
+					editor.addCommand( 'WP_Page', function() {
+						editor.execCommand( 'WP_More', 'nextpage' );
+					});
+
+					editor.addButton( 'wp_more', {
+						tooltip: 'Insert Read More tag',
+						onclick: function() {
+							editor.execCommand( 'WP_More', 'more' );
+						}
+					});
+
+					editor.addButton( 'wp_page', {
+						tooltip: 'Page break',
+						onclick: function() {
+							editor.execCommand( 'WP_More', 'nextpage' );
+						}
+					});
+
 				},
 				paste_preprocess: function( plugin, args ) {
 					if ( args.content.match( /^\s*(https?:\/\/[^\s"]+)\s*$/im ) ) {
@@ -374,7 +513,7 @@
 										$.getScript( $( val ).attr( 'src' ) );
 									} );
 							}
-							tinyMCE.activeEditor.insertContent( data );
+							tinymce.activeEditor.insertContent( data );
 							$( '#wp-fee-working' ).remove();
 						} );
 					}
@@ -457,7 +596,7 @@
 					event.preventDefault();
 					$( '#wp-fee-meta-modal' ).hide();
 				} );
-			var postFormat = ( postFormat = $( 'input[name=post_format]:checked' ).val() === '0' ? 'standard' : postFormat );
+			postFormat = ( postFormat = $( 'input[name=post_format]:checked' ).val() === '0' ? 'standard' : postFormat );
 			$( 'input[name=post_format]' )
 				.change( function () {
 					$( '.wp-fee-post' ).removeClass( 'format-' + postFormat );
@@ -467,24 +606,25 @@
 					$( '.wp-fee-body' ).addClass( 'single-format-' + postFormat );
 				} );
 			$( '.wp-fee-submit' )
-				.on( 'click', function( event ) {
-					var sumbitButton = $( this );
+				.on( 'click', function() {
+					var sumbitButton = $( this ),
+						postData, metaData;
 					if ( sumbitButton.hasClass( 'button-primary-disabled' ) || sumbitButton.hasClass( 'button-disabled' ) )
 						return;
 					sumbitButton
 						.addClass( sumbitButton.hasClass( 'button-primary' ) ? 'button-primary-disabled' : 'button-disabled' )
 						.text( sumbitButton.data( 'working' ) );
 
-					var postData = {
-							'action': 'wp_fee_post',
-							'post_ID': wp.fee.post.id(),
-							'post_title': wp.fee.post.title(),
-							'post_content': wp.fee.post.content(),
-							'publish' : ( sumbitButton.attr( 'id' ) === 'wp-fee-publish' ) ? 'Publish' : undefined,
-							'save' : ( sumbitButton.attr( 'id' ) === 'wp-fee-save' ) ? 'Save' : undefined,
-							'_wpnonce': wp.fee.post._wpnonce()
-						},
-						metaData = $( 'form' ).serializeObject();
+					postData = {
+						'action': 'wp_fee_post',
+						'post_ID': wp.fee.post.id(),
+						'post_title': wp.fee.post.title(),
+						'post_content': wp.fee.post.content(),
+						'publish' : ( sumbitButton.attr( 'id' ) === 'wp-fee-publish' ) ? 'Publish' : undefined,
+						'save' : ( sumbitButton.attr( 'id' ) === 'wp-fee-save' ) ? 'Save' : undefined,
+						'_wpnonce': wp.fee.post._wpnonce()
+					},
+					metaData = $( 'form' ).serializeObject();
 
 					$.extend( postData, metaData );
 

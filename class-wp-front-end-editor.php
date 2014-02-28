@@ -2,7 +2,7 @@
 
 class WP_Front_End_Editor {
 
-	const VERSION = '0.8.4';
+	const VERSION = '0.8.5';
 	const PLUGIN = 'wp-front-end-editor/wp-front-end-editor.php';
 
 	private static $instance;
@@ -129,6 +129,9 @@ class WP_Front_End_Editor {
 
 		add_rewrite_endpoint( 'edit', EP_PERMALINK | EP_PAGES | EP_ROOT );
 
+		add_post_type_support( 'post', 'front-end-editor' );
+		add_post_type_support( 'page', 'front-end-editor' );
+
 		add_action( 'wp', array( $this, 'wp' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_enqueue_scripts' ) );
 
@@ -161,13 +164,31 @@ class WP_Front_End_Editor {
 
 		global $post, $post_type, $post_type_object;
 
+		add_filter( 'body_class', array( $this, 'body_class' ) );
+
+		if ( ! empty( $_GET['get-post-lock'] ) ) {
+
+			require_once( ABSPATH . '/wp-admin/includes/post.php' );
+
+			wp_set_post_lock( $post->ID );
+
+			wp_redirect( $this->edit_link( $post->ID ) );
+
+			die();
+
+		}
+
 		if ( ! $this->is_edit() )
 
 			return;
-		
+
 		if ( ! $post )
 
 			wp_die( __( 'You attempted to edit an item that doesn&#8217;t exist. Perhaps it was deleted?' ) );
+
+		if ( ! post_type_supports( $post->post_type, 'front-end-editor' ) )
+
+			wp_redirect( get_permalink( $post->ID ) );
 
 		if ( ! current_user_can( 'edit_post', $post->ID ) )
 
@@ -192,12 +213,19 @@ class WP_Front_End_Editor {
 		add_action( 'wp_before_admin_bar_render', array( $this, 'wp_before_admin_bar_render' ), 100 );
 
 		add_filter( 'post_class', array( $this, 'post_class' ) );
-		add_filter( 'body_class', array( $this, 'body_class' ) );
 		add_filter( 'the_title', array( $this, 'the_title' ) );
 		add_filter( 'the_content', array( $this, 'the_content' ), 20 );
 		add_filter( 'wp_link_pages', '__return_empty_string', 20 );
 		add_filter( 'post_thumbnail_html', array( $this, 'post_thumbnail_html' ), 10, 5 );
 		add_filter( 'get_post_metadata', array( $this, 'get_post_metadata' ), 10, 4 );
+
+		$check_users = get_users( array( 'fields' => 'ID', 'number' => 2 ) );
+
+		if ( count( $check_users ) > 1 )
+
+			add_action( 'wp_print_footer_scripts', '_admin_notice_post_locked' );
+
+		unset( $check_users );
 
 	}
 
@@ -216,10 +244,11 @@ class WP_Front_End_Editor {
 
 			return get_permalink( $id );
 
-		if ( ! is_admin()
-			|| ( $pagenow === 'revision.php'
-				&& isset( $_GET['redirect'] )
-				&& $_GET['redirect'] === 'front' ) )
+		if ( post_type_supports( $post->post_type, 'front-end-editor' )
+			&& ( ! is_admin()
+				|| ( $pagenow === 'revision.php'
+					&& isset( $_GET['redirect'] )
+					&& $_GET['redirect'] === 'front' ) ) )
 
 			return $this->edit_link( $id );
 
@@ -229,9 +258,15 @@ class WP_Front_End_Editor {
 
 	public function edit_post_link( $link, $id ) {
 
+		require_once( ABSPATH . '/wp-admin/includes/post.php' );
+
 		if ( $this->is_edit() )
 
 			return '<a class="post-edit-link" href="' . get_permalink( $id ) . '">' . __( 'Cancel' ) . '</a>';
+
+		if ( wp_check_post_lock( $id ) )
+
+			return '<a class="post-edit-link" href="' . $this->edit_link( $id ) . '">' . __( 'LOCKED' ) . '</a>';
 
 		return $link;
 
@@ -388,7 +423,7 @@ class WP_Front_End_Editor {
 			wp_enqueue_script( 'tipsy', $this->url( 'js/jquery.tipsy.js' ), array( 'jquery' ), self::VERSION, true );
 			wp_enqueue_script( 'heartbeat' );
 			wp_enqueue_script( 'postbox', admin_url( 'js/postbox.js' ), array( 'jquery-ui-sortable' ), self::VERSION, true );
-			wp_enqueue_script( 'post-custom', version_compare( $wp_version, '3.9-alpha', '<' ) ? $this->url( '/js/post.js' ) : admin_url( 'js/post.js' ), array( 'suggest', 'wp-lists', 'postbox', 'heartbeat' ), self::VERSION, true );
+			wp_enqueue_script( 'post-custom', $this->url( '/js/post.js' ), array( 'suggest', 'wp-lists', 'postbox', 'heartbeat' ), self::VERSION, true );
 
 			$vars = array(
 				'ok' => __( 'OK' ),
@@ -423,7 +458,7 @@ class WP_Front_End_Editor {
 				'blog_id' => get_current_blog_id(),
 			) );
 			
-			wp_enqueue_script( 'tinymce-4', $this->url( '/js/tinymce/tinymce' . ( SCRIPT_DEBUG ? '' : '.min' ) . '.js' ), array(), '4.0.16', true );
+			wp_enqueue_script( 'tinymce-4', $this->url( '/js/tinymce/tinymce' . ( SCRIPT_DEBUG ? '' : '.min' ) . '.js' ), array(), '4.0.18', true );
 			wp_enqueue_script( 'wp-front-end-editor', $this->url( '/js/wp-front-end-editor.js' ), array(), self::VERSION, true );
 
 			$vars = array(
@@ -448,11 +483,24 @@ class WP_Front_End_Editor {
 
 		} else {
 
+			wp_enqueue_style( 'wp-fee-adminbar' , $this->url( '/css/wp-fee-adminbar.css' ), false, self::VERSION, 'screen' );
+
+			wp_enqueue_script( 'tipsy', $this->url( 'js/jquery.tipsy.js' ), array( 'jquery' ), self::VERSION, true );
 			wp_enqueue_script( 'wp-fee-adminbar', $this->url( '/js/wp-fee-adminbar.js' ), array( 'jquery' ), self::VERSION, true );
+
+			if ( is_singular() ) {
+
+				require_once( ABSPATH . '/wp-admin/includes/post.php' );
+
+				$user_id = wp_check_post_lock( $post->ID );
+				$user = get_userdata( $user_id );
+
+			}
 
 			$vars = array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-				'homeUrl' => home_url( '/' )
+				'homeUrl' => home_url( '/' ),
+				'lock' => ( is_singular() && $user_id ) ? $user->display_name : false
 			);
 
 			wp_localize_script( 'wp-fee-adminbar', 'wpFee', $vars );
@@ -592,27 +640,38 @@ class WP_Front_End_Editor {
 
 	public function post_class( $classes ) {
 
-        $classes[] = 'wp-fee-post';
+		$classes[] = 'wp-fee-post';
 
-        return $classes;
+		return $classes;
 
 	}
 
 	public function body_class( $classes ) {
 
-        $classes[] = 'wp-fee-body';
+		global $post;
 
-        return $classes;
+		if ( $this->is_edit() )
+
+			$classes[] = 'wp-fee-body';
+
+		require_once( ABSPATH . '/wp-admin/includes/post.php' );
+
+		if ( is_singular()
+			&& wp_check_post_lock( $post->ID ) )
+
+			$classes[] = 'wp-fee-locked';
+
+		return $classes;
 
 	}
 
 	public function the_title( $title ) {
 
-        if ( empty( $title ) )
+		if ( empty( $title ) )
 
-        	$title = ' ';
+			$title = ' ';
 
-        return $title;
+		return $title;
 
 	}
 
@@ -641,7 +700,6 @@ class WP_Front_End_Editor {
 			$content = wpautop( $content );
 			$content = shortcode_unautop( $content );
 			$content = $this->do_shortcode( $content );
-			$content = str_replace( array( '<!--nextpage-->', '<!--more-->' ), array( esc_html( '<!--nextpage-->' ), esc_html( '<!--more-->' ) ), $content );
 			$content = '<div class="wp-fee-content-holder"><p class="wp-fee-content-placeholder">&hellip;</p><div id="wp-fee-content-' . $post->ID . '" class="wp-fee-content">' . $content . '</div></div>';
 
 		}
@@ -764,7 +822,6 @@ class WP_Front_End_Editor {
 			$this->response( __( 'You are not allowed to edit this item.' ) );
 
 		$_POST['post_title'] = strip_tags( $_POST['post_title'] );
-		$_POST['post_content'] = str_replace( array( esc_html( '<!--nextpage-->' ), esc_html( '<!--more-->' ) ), array( '<!--nextpage-->', '<!--more-->' ), $_POST['post_content'] );
 
 		$post_id = edit_post();
 		
@@ -974,6 +1031,12 @@ class WP_Front_End_Editor {
 		
 		set_current_screen( $post_type );
 
+		if ( ! wp_check_post_lock( $post->ID ) ) {
+
+			$active_post_lock = wp_set_post_lock( $post->ID );
+
+		}
+
 		$messages = array();
 		$messages['post'] = array(
 			 0 => '', // Unused. Messages start at index 1.
@@ -1151,18 +1214,18 @@ class WP_Front_End_Editor {
 
 			}
 
-        }
+		}
 
-        if ( ! isset( $wp_meta_modal_sections[$context][$priority]) )
+		if ( ! isset( $wp_meta_modal_sections[$context][$priority]) )
 
 			$wp_meta_modal_sections[$context][$priority] = array();
 
-        $wp_meta_modal_sections[$context][$priority][$id] = array(
-        	'id' => $id,
-        	'title' => $title,
-        	'callback' => $callback,
-        	'args' => $args
-        );
+		$wp_meta_modal_sections[$context][$priority][$id] = array(
+			'id' => $id,
+			'title' => $title,
+			'callback' => $callback,
+			'args' => $args
+		);
 
 	}
 

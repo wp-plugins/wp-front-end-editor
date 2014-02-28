@@ -374,6 +374,7 @@ jQuery(document).ready( function($) {
 		sticky = '',
 		last = 0,
 		co = $('#content'),
+		$document = $(document),
 		$editSlugWrap = $('#edit-slug-box'),
 		postId = $('#post_ID').val() || 0,
 		$submitpost = $('#submitpost'),
@@ -383,6 +384,10 @@ jQuery(document).ready( function($) {
 		$postStatusSelect = $('#post-status-select');
 
 	postboxes.add_postbox_toggles(pagenow);
+
+	// Clear the window name. Otherwise if this is a former preview window where the user navigated to edit another post,
+	// and the first post is still being edited, clicking Preview there will use this window to show the preview.
+	window.name = '';
 
 	// Post locks: contain focus inside the dialog. If the dialog is shown, focus the first item.
 	$('#post-lock-dialog .notification-dialog').on( 'keydown', function(e) {
@@ -505,7 +510,7 @@ jQuery(document).ready( function($) {
 		});
 	}
 
-	$(document).on( 'autosave-disable-buttons.edit-post', function() {
+	$document.on( 'autosave-disable-buttons.edit-post', function() {
 		$submitButtons.addClass( 'disabled' );
 	}).on( 'autosave-enable-buttons.edit-post', function() {
 		if ( ! wp.heartbeat || ! wp.heartbeat.hasConnectionError() ) {
@@ -936,7 +941,7 @@ jQuery(document).ready( function($) {
 
 	// word count
 	if ( typeof(wpWordCount) != 'undefined' ) {
-		$(document).triggerHandler('wpcountwords', [ co.val() ]);
+		$document.triggerHandler('wpcountwords', [ co.val() ]);
 
 		co.keyup( function(e) {
 			var k = e.keyCode || e.charCode;
@@ -945,7 +950,7 @@ jQuery(document).ready( function($) {
 				return true;
 
 			if ( 13 == k || 8 == last || 46 == last )
-				$(document).triggerHandler('wpcountwords', [ co.val() ]);
+				$document.triggerHandler('wpcountwords', [ co.val() ]);
 
 			last = k;
 			return true;
@@ -981,7 +986,6 @@ jQuery(document).ready( function($) {
 	// Resize the visual and text editors
 	( function() {
 		var editor, offset, mce,
-			$document = $( document ),
 			$textarea = $('textarea#content'),
 			$handle = $('#post-status-info');
 
@@ -1059,4 +1063,5 @@ jQuery(document).ready( function($) {
 			}
 		});
 	}
+
 });
