@@ -2,7 +2,7 @@
 
 class WP_Front_End_Editor {
 
-	const VERSION = '0.8.5';
+	const VERSION = '0.9.0';
 	const PLUGIN = 'wp-front-end-editor/wp-front-end-editor.php';
 
 	private static $instance;
@@ -58,21 +58,33 @@ class WP_Front_End_Editor {
 
 			return;
 
-		if ( $id == get_option( 'page_on_front' ) )
+		if ( $id == get_option( 'page_on_front' ) ) {
 
-			return home_url( '?editing' );
+			$link = home_url( '?editing' );
 
-		$permalink = get_permalink( $post->ID );
+		} else {
 
-		if ( strpos( $permalink, '?' ) !== false )
+			$permalink = get_permalink( $post->ID );
 
-			return add_query_arg( 'edit', '', $permalink );
+			if ( strpos( $permalink, '?' ) !== false )
 
-		if ( trailingslashit( $permalink ) === $permalink )
+				$link = add_query_arg( 'edit', '', $permalink );
 
-			return trailingslashit( $permalink . 'edit' );
+			if ( trailingslashit( $permalink ) === $permalink )
 
-		return trailingslashit( $permalink ) . 'edit';
+				$link = trailingslashit( $permalink . 'edit' );
+
+			if ( ! isset( $link ) )
+
+				$link = trailingslashit( $permalink ) . 'edit';
+
+		}
+
+		if ( force_ssl_admin() )
+
+			$link = set_url_scheme( $link, 'https' );
+
+		return $link;
 
 	}
 
@@ -134,6 +146,7 @@ class WP_Front_End_Editor {
 
 		add_action( 'wp', array( $this, 'wp' ) );
 		add_action( 'admin_enqueue_scripts', array( $this, 'admin_enqueue_scripts' ) );
+		add_action( 'wp_default_scripts', array( $this, 'wp_default_scripts' ) );
 
 		if ( isset( $_POST['wp_fee_redirect'] )
 			&& $_POST['wp_fee_redirect'] == '1' )
@@ -182,13 +195,34 @@ class WP_Front_End_Editor {
 
 			return;
 
+		if ( force_ssl_admin()
+			&& ! is_ssl() ) {
+
+			wp_redirect( set_url_scheme( get_permalink( $post->ID ), 'https' ) );
+
+			die();
+
+		}
+
 		if ( ! $post )
 
 			wp_die( __( 'You attempted to edit an item that doesn&#8217;t exist. Perhaps it was deleted?' ) );
 
-		if ( ! post_type_supports( $post->post_type, 'front-end-editor' ) )
+		if ( ! post_type_supports( $post->post_type, 'front-end-editor' ) ) {
 
 			wp_redirect( get_permalink( $post->ID ) );
+
+			die();
+
+		}
+
+		if ( ! is_user_logged_in() ) {
+
+			wp_redirect( wp_login_url( $this->edit_link( $post->ID ) ) );
+
+			die();
+
+		}
 
 		if ( ! current_user_can( 'edit_post', $post->ID ) )
 
@@ -209,6 +243,7 @@ class WP_Front_End_Editor {
 		add_action( 'wp_head', array( $this, 'wp_head' ) );
 		add_action( 'wp_print_footer_scripts', 'wp_auth_check_html' );
 		add_action( 'wp_print_footer_scripts', array( $this, 'meta_modal' ) );
+		add_action( 'wp_print_footer_scripts', array( $this, 'link_modal' ) );
 		add_action( 'admin_bar_menu', array( $this, 'admin_bar_menu' ), 10 );
 		add_action( 'wp_before_admin_bar_render', array( $this, 'wp_before_admin_bar_render' ), 100 );
 
@@ -395,7 +430,7 @@ class WP_Front_End_Editor {
 
 		?><script type="text/javascript">
 		addLoadEvent = function(func){if(typeof jQuery!="undefined")jQuery(document).ready(func);else if(typeof wpOnload!='function'){wpOnload=func;}else{var oldonload=wpOnload;wpOnload=function(){oldonload();func();}}};
-		var ajaxurl = '<?php echo admin_url( 'admin-ajax.php', 'relative' ); ?>',
+		var ajaxurl = '<?php echo admin_url( 'admin-ajax.php' ); ?>',
 			pagenow = '<?php echo $current_screen->id; ?>',
 			typenow = '<?php echo $current_screen->post_type; ?>',
 			adminpage = '<?php echo $admin_body_class; ?>',
@@ -423,7 +458,7 @@ class WP_Front_End_Editor {
 			wp_enqueue_script( 'tipsy', $this->url( 'js/jquery.tipsy.js' ), array( 'jquery' ), self::VERSION, true );
 			wp_enqueue_script( 'heartbeat' );
 			wp_enqueue_script( 'postbox', admin_url( 'js/postbox.js' ), array( 'jquery-ui-sortable' ), self::VERSION, true );
-			wp_enqueue_script( 'post-custom', $this->url( '/js/post.js' ), array( 'suggest', 'wp-lists', 'postbox', 'heartbeat' ), self::VERSION, true );
+			wp_enqueue_script( 'post-custom', $this->url( '/js/post.js' ), array( 'suggest', 'wp-lists', 'postbox', 'heartbeat', 'utils' ), self::VERSION, true );
 
 			$vars = array(
 				'ok' => __( 'OK' ),
@@ -455,7 +490,7 @@ class WP_Front_End_Editor {
 			
 			wp_localize_script( 'autosave-custom', 'autosaveL10n', array(
 				'autosaveInterval' => AUTOSAVE_INTERVAL,
-				'blog_id' => get_current_blog_id(),
+				'blog_id' => get_current_blog_id()
 			) );
 			
 			wp_enqueue_script( 'tinymce-4', $this->url( '/js/tinymce/tinymce' . ( SCRIPT_DEBUG ? '' : '.min' ) . '.js' ), array(), '4.0.18', true );
@@ -474,14 +509,26 @@ class WP_Front_End_Editor {
 				'autosaveInterval' => AUTOSAVE_INTERVAL,
 				'savingText' => __( 'Saving Draft&#8230;' ),
 				'saveAlert' => __( 'The changes you made will be lost if you navigate away from this page.' ),
-				'blog_id' => get_current_blog_id(),
+				'blog_id' => get_current_blog_id()
 			) );
 
 			wp_enqueue_media( array( 'post' => $post ) );
 
+			wp_enqueue_script( 'wp-link', $this->url( '/js/wp-link.js' ), array( 'jquery' ), self::VERSION, true );
+
+			wp_localize_script( 'wp-link', 'wpLinkL10n', array(
+				'title' => __('Insert/edit link'),
+				'update' => __('Update'),
+				'save' => __('Add Link'),
+				'noTitle' => __('(no title)'),
+				'noMatchesFound' => __('No matches found.')
+			) );
+
+			wp_enqueue_style( 'wp-fee-link-modal' , $this->url( '/css/link-modal.css' ), false, self::VERSION, 'screen' );
+
 			wp_enqueue_style( 'wp-fee' , $this->url( '/css/wp-fee.css' ), false, self::VERSION, 'screen' );
 
-		} else {
+		} elseif ( is_user_logged_in() ) {
 
 			wp_enqueue_style( 'wp-fee-adminbar' , $this->url( '/css/wp-fee-adminbar.css' ), false, self::VERSION, 'screen' );
 
@@ -506,6 +553,17 @@ class WP_Front_End_Editor {
 			wp_localize_script( 'wp-fee-adminbar', 'wpFee', $vars );
 
 		}
+
+	}
+
+	public function wp_default_scripts( &$scripts ) {
+
+		$suffix = SCRIPT_DEBUG ? '' : '.min';
+
+		$scripts->add( 'image-edit', "/wp-admin/js/image-edit$suffix.js", array('jquery', 'json2', 'imgareaselect'), false, 1 );
+		did_action( 'init' ) && $scripts->localize( 'image-edit', 'imageEditL10n', array(
+			'error' => __( 'Could not load the preview image. Please reload the page and try again.' )
+		));
 
 	}
 
@@ -650,9 +708,12 @@ class WP_Front_End_Editor {
 
 		global $post;
 
-		if ( $this->is_edit() )
+		if ( $this->is_edit() ) {
 
 			$classes[] = 'wp-fee-body';
+			$classes[] = esc_attr( 'wp-fee-status-' . $post->post_status );
+
+		}
 
 		require_once( ABSPATH . '/wp-admin/includes/post.php' );
 
@@ -732,6 +793,7 @@ class WP_Front_End_Editor {
 				</div>
 				<div class="wp-fee-shortcode-options">
 					<a href="#" id="wp-fee-set-post-thumbnail"></a>
+					<div class="wp-core-ui"><a href="#" class="wp-fee-set-post-thumbnail">Add a featured image</a></div>
 				</div>
 			</div>
 			';
@@ -893,7 +955,7 @@ class WP_Front_End_Editor {
 
 		if ( $m[1] == '[' && $m[6] == ']' )
 
-			return substr($m[0], 1, -1);
+			return $m[0];
 
 		$tag = $m[2];
 		$attr = shortcode_parse_atts( $m[3] );
@@ -909,10 +971,7 @@ class WP_Front_End_Editor {
 				$r .= $m[1] . call_user_func( $shortcode_tags[$tag], $attr, $m[5], $tag ) . $m[6];
 				$r .= '<div class="wp-fee-shortcode-options" style="display: none;">';
 					$r .= '<div class="wp-fee-shortcode-remove" onmousedown="return false;"></div>';
-					$r .= '<div class="wp-fee-shortcode-view" onmousedown="return false;"></div>';
 					$r .= '<div class="wp-fee-shortcode-edit" data-kind="' . $tag . '" onmousedown="return false;"></div>';
-					$r .= '<div class="wp-fee-shortcode-insert-top" onmousedown="return false;"></div>';
-					$r .= '<div class="wp-fee-shortcode-insert-bottom" onmousedown="return false;"></div>';
 				$r .= '</div>';
 			$r .= '</div>';
 
@@ -938,9 +997,6 @@ class WP_Front_End_Editor {
 				$r .= $embed;
 				$r .= '<div class="wp-fee-shortcode-options" style="display: none;">';
 					$r .= '<div class="wp-fee-shortcode-remove" onmousedown="return false;"></div>';
-					$r .= '<div class="wp-fee-shortcode-view" onmousedown="return false;"></div>';
-					$r .= '<div class="wp-fee-shortcode-insert-top" onmousedown="return false;"></div>';
-					$r .= '<div class="wp-fee-shortcode-insert-bottom" onmousedown="return false;"></div>';
 				$r .= '</div>';
 			$r .= '</div>';
 
@@ -974,9 +1030,6 @@ class WP_Front_End_Editor {
 			$r .= $return;
 			$r .= '<div class="wp-fee-shortcode-options" style="display: none;">';
 				$r .= '<div class="wp-fee-shortcode-remove" onmousedown="return false;"></div>';
-				$r .= '<div class="wp-fee-shortcode-view" onmousedown="return false;"></div>';
-				$r .= '<div class="wp-fee-shortcode-insert-top" onmousedown="return false;"></div>';
-				$r .= '<div class="wp-fee-shortcode-insert-bottom" onmousedown="return false;"></div>';
 			$r .= '</div>';
 		$r .= '</div>';
 
@@ -990,7 +1043,7 @@ class WP_Front_End_Editor {
 
 		$post = get_default_post_to_edit( isset( $_POST['post_type'] ) ? $_POST['post_type'] : 'post', true );
 
-		$this->response( $post->ID );
+		$this->response( $this->edit_link( $post->ID ) );
 
 	}
 
@@ -1426,6 +1479,70 @@ class WP_Front_End_Editor {
 		global $wp_current_filter;
 
 		return in_array( $tag, $wp_current_filter );
+
+	}
+
+	public function link_modal() {
+
+		$search_panel_visible = '1' == get_user_setting( 'wplink', '0' ) ? ' class="search-panel-visible wp-core-ui"' : ' class="wp-core-ui"';
+
+		?>
+		<div id="wp-link-backdrop"></div>
+		<div id="wp-link-wrap"<?php echo $search_panel_visible; ?>>
+		<form id="wp-link" tabindex="-1">
+		<?php wp_nonce_field( 'internal-linking', '_ajax_linking_nonce', false ); ?>
+		<div id="link-modal-title">
+			<?php _e( 'Insert/edit link' ) ?>
+			<div id="wp-link-close" tabindex="0"></div>
+		</div>
+		<div id="link-selector">
+			<div id="link-options">
+				<p class="howto"><?php _e( 'Enter the destination URL' ); ?></p>
+				<div>
+					<label><span><?php _e( 'URL' ); ?></span><input id="url-field" type="text" name="href" /></label>
+				</div>
+				<div>
+					<label><span><?php _e( 'Title' ); ?></span><input id="link-title-field" type="text" name="linktitle" /></label>
+				</div>
+				<div class="link-target">
+					<label><span>&nbsp;</span><input type="checkbox" id="link-target-checkbox" /> <?php _e( 'Open link in a new window/tab' ); ?></label>
+				</div>
+			</div>
+			<p class="howto" id="wp-link-search-toggle"><?php _e( 'Or link to existing content' ); ?></p>
+			<div id="search-panel">
+				<div class="link-search-wrapper">
+					<label>
+						<span class="search-label"><?php _e( 'Search' ); ?></span>
+						<input type="search" id="search-field" class="link-search-field" autocomplete="off" />
+						<span class="spinner"></span>
+					</label>
+				</div>
+				<div id="search-results" class="query-results">
+					<ul></ul>
+					<div class="river-waiting">
+						<span class="spinner"></span>
+					</div>
+				</div>
+				<div id="most-recent-results" class="query-results">
+					<div class="query-notice"><em><?php _e( 'No search term specified. Showing recent items.' ); ?></em></div>
+					<ul></ul>
+					<div class="river-waiting">
+						<span class="spinner"></span>
+					</div>
+				</div>
+			</div>
+		</div>
+		<div class="submitbox">
+			<div id="wp-link-update">
+				<input type="submit" value="<?php esc_attr_e( 'Add Link' ); ?>" class="button button-primary" id="wp-link-submit" name="wp-link-submit">
+			</div>
+			<div id="wp-link-cancel">
+				<a class="submitdelete deletion" href="#"><?php _e( 'Cancel' ); ?></a>
+			</div>
+		</div>
+		</form>
+		</div>
+		<?php
 
 	}
 

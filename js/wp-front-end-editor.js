@@ -34,6 +34,10 @@
 				}
 			} );
 		},
+		createPadNode: function( editor ) {
+			return editor.dom.create( 'p', { 'data-wpview-pad': 1 },
+				( tinymce.Env.ie && tinymce.Env.ie < 11 ) ? '' : '<br data-mce-bogus="1" />' );
+		},
 		send_to_editor: function( content ) {
 			if ( content.slice( 0, 8 ) === '[gallery' || content.slice( 0, 8 ) === '[caption' ) {
 				var data = {
@@ -41,7 +45,26 @@
 						'shortcode': content
 					};
 				$.post( wp.fee.ajaxUrl, data, function( data ) {
-					tinymce.activeEditor.insertContent( data );
+					var editor = tinymce.activeEditor,
+						dom = editor.dom,
+						body, padNode, caret;
+					editor.insertContent( data );
+					body = editor.getBody();
+					if ( dom.hasClass( body.firstChild, 'wp-fee-shortcode-container' ) ) {
+						padNode = wp.fee.createPadNode( editor );
+						body.insertBefore( padNode, body.firstChild );
+					}
+					if ( dom.hasClass( body.lastChild, 'wp-fee-shortcode-container' ) ) {
+						padNode = wp.fee.createPadNode( editor );
+						body.appendChild( padNode, body.firstChild );
+					}
+					caret = editor.selection.getNode();
+					while ( caret && ! dom.hasClass( caret, 'mce-content-body' ) ) {
+						if ( dom.hasClass( caret, 'wp-fee-shortcode-container' ) ) {
+							editor.selection.setCursorLocation( dom.getNext( caret, '*' ), 0 );
+						}
+						caret = caret.parentNode;
+					}
 				} );
 			} else {
 				tinymce.activeEditor.insertContent( content );
@@ -135,10 +158,14 @@
 
 	$( document )
 		.on( 'autosave-enable-buttons', function() {
-			$( '.wp-fee-submit' ).removeClass( $( '.wp-fee-submit' ).hasClass( 'button-primary' ) ? 'button-primary-disabled' : 'button-disabled' );
+			$( '.wp-fee-submit' ).each( function() {
+				$( this ).removeClass( $( this ).hasClass( 'button-primary' ) ? 'button-primary-disabled' : 'button-disabled' );
+			} );
 		} )
 		.on( 'autosave-disable-buttons', function() {
-			$( '.wp-fee-submit' ).addClass( $( '.wp-fee-submit' ).hasClass( 'button-primary' ) ? 'button-primary-disabled' : 'button-disabled' );
+			$( '.wp-fee-submit' ).each( function() {
+				$( this ).addClass( $( this ).hasClass( 'button-primary' ) ? 'button-primary-disabled' : 'button-disabled' );
+			} );
 		} )
 		.on( 'mouseenter', '.wp-fee-shortcode-container', function() {
 			$( this ).find( '.wp-fee-shortcode-options' ).fadeIn( 'fast' );
@@ -156,31 +183,16 @@
 			$( '.fee-edit-thumbnail' ).removeClass( 'empty' );
 			$( '#set-post-thumbnail' ).click();
 		} )
+		.on( 'click', '.wp-fee-set-post-thumbnail', function() {
+			$( '#wp-fee-set-post-thumbnail' ).click();
+		} )
 		.on( 'click', '.media-modal-close', function() {
-			if ( ! $( '.fee-edit-thumbnail' ).find( 'img' ).not( '.wp-fee-thumbnail-dummy' ).length ) {
+			if ( ! $( '.fee-edit-thumbnail' ).find( 'img' ).length ) {
 				$( '.fee-edit-thumbnail' ).addClass( 'empty' );
 			}
 		} )
 		.on( 'click', '.wp-fee-shortcode-view', function() {
 			$( this ).parents( '.wp-fee-shortcode-container' ).find( '.wp-fee-shortcode-options' ).fadeOut( 'fast' );
-		} )
-		.on( 'click', '.wp-fee-shortcode-insert-top', function() {
-			var container = $( this ).parents( '.wp-fee-shortcode-container' ),
-				prev = container.prev();
-			if ( prev.length && prev.is( 'p' ) && ! prev.text().replace(/[\x20\s\t\r\n\f]+/g, '') ) {
-				prev.remove();
-			} else {
-				container.before( '<p><br data-mce-bogus="1"></p>' );
-			}
-		} )
-		.on( 'click', '.wp-fee-shortcode-insert-bottom', function() {
-			var container = $( this ).parents( '.wp-fee-shortcode-container' ),
-				next = container.next();
-			if ( next.length && next.is( 'p' ) && ! next.text().replace(/[\x20\s\t\r\n\f]+/g, '') ) {
-				next.remove();
-			} else {
-				container.after( '<p><br data-mce-bogus="1"></p>' );
-			}
 		} )
 		.on( 'click', '.wp-fee-shortcode-remove', function() {
 			$( this ).parents( '.wp-fee-shortcode-container' ).remove();
@@ -313,9 +325,9 @@
 			tinymce.init( {
 				selector: '#wp-fee-content-' + wp.fee.post.id(),
 				inline: true,
-				plugins: 'wpfeelink charmap paste textcolor table noneditable',
-				toolbar1: 'kitchensink formatselect bold italic underline strikethrough blockquote alignleft aligncenter alignright alignjustify wp_more link media undo redo',
-				toolbar2: 'kitchensink removeformat pastetext bullist numlist outdent indent forecolor backcolor table undo redo',
+				plugins: 'wplink charmap paste table noneditable hr',
+				toolbar1: 'kitchensink formatselect bold italic strikethrough blockquote alignleft aligncenter alignright wp_more link media undo redo',
+				toolbar2: 'kitchensink removeformat pastetext hr bullist numlist outdent indent table undo redo',
 				menubar: false,
 				fixed_toolbar_container: '#wp-admin-bar-wp-fee-mce-toolbar',
 				skin: false,
@@ -380,6 +392,23 @@
 							e.content = e.content.replace( /<!--(.*?)-->/g, '&lt;!--$1--&gt;' );
 						}
 					});
+
+					editor.on( 'SetContent', function( event ) {
+						var body, padNode;
+						// Add padding <p> if the noneditable node is last
+						if ( event.load || ! event.set ) {
+							body = editor.getBody();
+							if ( editor.dom.hasClass( body.firstChild, 'wp-fee-shortcode-container' ) ) {
+								padNode = wp.fee.createPadNode( editor );
+								body.insertBefore( padNode, body.firstChild );
+							}
+							if ( editor.dom.hasClass( body.lastChild, 'wp-fee-shortcode-container' ) ) {
+								padNode = wp.fee.createPadNode( editor );
+								body.appendChild( padNode, body.lastChild );
+							}
+						}
+					});
+
 					// Replace images with tags
 					editor.on( 'PostProcess', function( e ) {
 						if ( e.get ) {
@@ -401,6 +430,18 @@
 							});
 							e.content = e.content.replace( /&lt;!--(.*?)--&gt;/g, '<!--$1-->' );
 						}
+					});
+
+					editor.on( 'PreProcess', function( event ) {
+						var dom = editor.dom;
+						// Remove empty padding nodes
+						tinymce.each( dom.select( 'p[data-wpview-pad]', event.node ), function( node ) {
+							if ( dom.isEmpty( node ) ) {
+								dom.remove( node );
+							} else {
+								dom.setAttrib( node, 'data-wpview-pad', null );
+							}
+						});
 					});
 
 					// Display the tag name instead of img in element path
@@ -542,7 +583,6 @@
 				}
 			} );
 			$( '.fee-edit-thumbnail' )
-				.append( '<img src="' + wp.fee.blankGif + '" alt="" class="attachment-post-thumbnail wp-post-image wp-fee-thumbnail-dummy">' )
 				.on( 'mouseenter', function() {
 					$( this ).find( '.fee-edit-thumbnail-button' ).fadeIn( 'fast' );
 				} )
@@ -555,18 +595,18 @@
 					$( '#wp-fee-meta-modal .media-frame-content' ).scrollTop( $( '#wp-fee-meta-modal-box-' + $( this ).data( 'box' ) ).position().top + 1 );
 				} );
 			$( '#wp-admin-bar-wp-fee-backend a' )
-				.tipsy();
+				.tipsy( { className: 'tipsy-bar' } );
 			$( '#wp-admin-bar-wp-fee-close a' )
-				.tipsy( { gravity: 'ne' } );
+				.tipsy( { gravity: 'ne', className: 'tipsy-bar' } );
 			$( '#wp-admin-bar-wp-fee-meta a' )
-				.tipsy()
+				.tipsy( { className: 'tipsy-bar' } )
 				.on( 'click', function( event ) {
 					event.preventDefault();
 					$( '#wp-fee-meta-modal' ).show();
 					wp.fee.recalcBoxPos();
 				} );
 			$( '#wp-admin-bar-wp-fee-cats a' )
-				.tipsy();
+				.tipsy( { className: 'tipsy-bar' } );
 			$( '#wp-admin-bar-wp-fee-cats a, a[rel~="category"]' )
 				.on( 'click', function( event ) {
 					event.preventDefault();
@@ -575,7 +615,7 @@
 					$( '#media-menu-categorydiv' ).trigger( 'click' );
 				} );
 			$( '#wp-admin-bar-wp-fee-tags a' )
-				.tipsy();
+				.tipsy( { className: 'tipsy-bar' } );
 			$( '#wp-admin-bar-wp-fee-tags a, a[rel="tag"]' )
 				.on( 'click', function( event ) {
 					event.preventDefault();
