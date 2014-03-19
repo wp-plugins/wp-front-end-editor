@@ -42,7 +42,8 @@
 			if ( content.slice( 0, 8 ) === '[gallery' || content.slice( 0, 8 ) === '[caption' ) {
 				var data = {
 						'action': 'wp_fee_shortcode',
-						'shortcode': content
+						'shortcode': content,
+						'post_id': wp.fee.post.id()
 					};
 				$.post( wp.fee.ajaxUrl, data, function( data ) {
 					var editor = tinymce.activeEditor,
@@ -179,11 +180,13 @@
 		.on( 'mouseleave', '.fee-edit-thumbnail', function() {
 			$( this ).find( '#remove-post-thumbnail' ).fadeOut( 'fast' );
 		} )
-		.on( 'click', '#wp-fee-set-post-thumbnail', function() {
+		.on( 'click', '#wp-fee-set-post-thumbnail', function( event ) {
+			event.preventDefault();
 			$( '.fee-edit-thumbnail' ).removeClass( 'empty' );
 			$( '#set-post-thumbnail' ).click();
 		} )
-		.on( 'click', '.wp-fee-set-post-thumbnail', function() {
+		.on( 'click', '.wp-fee-set-post-thumbnail', function( event ) {
+			event.preventDefault();
 			$( '#wp-fee-set-post-thumbnail' ).click();
 		} )
 		.on( 'click', '.media-modal-close', function() {

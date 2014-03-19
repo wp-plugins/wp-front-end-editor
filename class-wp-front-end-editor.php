@@ -2,7 +2,7 @@
 
 class WP_Front_End_Editor {
 
-	const VERSION = '0.9.0';
+	const VERSION = '0.9.1';
 	const PLUGIN = 'wp-front-end-editor/wp-front-end-editor.php';
 
 	private static $instance;
@@ -493,7 +493,7 @@ class WP_Front_End_Editor {
 				'blog_id' => get_current_blog_id()
 			) );
 			
-			wp_enqueue_script( 'tinymce-4', $this->url( '/js/tinymce/tinymce' . ( SCRIPT_DEBUG ? '' : '.min' ) . '.js' ), array(), '4.0.18', true );
+			wp_enqueue_script( 'tinymce-4', $this->url( '/js/tinymce/tinymce' . ( SCRIPT_DEBUG ? '' : '.min' ) . '.js' ), array(), '4.0.20', true );
 			wp_enqueue_script( 'wp-front-end-editor', $this->url( '/js/wp-front-end-editor.js' ), array(), self::VERSION, true );
 
 			$vars = array(
@@ -925,6 +925,15 @@ class WP_Front_End_Editor {
 	}
 
 	public function wp_fee_shortcode() {
+
+		global $post;
+
+		if ( isset( $_POST['post_id'] ) ) {
+
+			$post = $_POST['post_id'];
+			$post = get_post( $post );
+
+		}
 
 		$r = $_POST['shortcode'];
 		$r = wp_unslash( $r );
