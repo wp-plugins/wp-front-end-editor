@@ -14,8 +14,6 @@ If you found a bug or if you have ideas, add them to [the GitHub issue tracker](
 
 **Weekly IRC Chat:** Tuesdays, 17:00 UTC, [#wordpress-ui](http://codex.wordpress.org/IRC).
 
-If you'd like to join our Skype chat, add jannekevandorpe and mention this plugin.
-
 [WordPress Plugin](http://wordpress.org/plugins/wp-front-end-editor/)  
 [GitHub](https://github.com/avryl/wp-front-end-editor)  
 [Features as Plugins Tracking](http://make.wordpress.org/core/features-as-plugins/)  
