@@ -1,4 +1,5 @@
-/* global tinymce, wpCookies, autosaveL10n */
+/* global wpCookies, autosaveL10n */
+
 // Back-compat: prevent fatal errors
 window.autosave = function(){};
 
@@ -14,16 +15,16 @@ window.autosave = function(){};
 		 * @return object Object containing the post data
 		 */
 		function getPostData( type ) {
-			var post_name, parent_id, data,
+			var data,
 				cats = [];
 
 			data = {
-				post_id: wp.fee.post.id(),
-				post_type: wp.fee.post.type(),
-				post_author: wp.fee.post.author(),
-				post_title: wp.fee.post.title(),
-				content: type === 'local' ? wp.fee.post.content( 'raw' ) : wp.fee.post.content(),
-				excerpt: wp.fee.post.excerpt()
+				post_id: wp.fee.post.post_ID(),
+				post_type: wp.fee.post.post_type(),
+				post_author: wp.fee.post.post_author(),
+				post_title: wp.fee.post.post_title(),
+				content: type === 'local' ? wp.fee.post.post_content( 'raw' ) : wp.fee.post.post_content(),
+				excerpt: wp.fee.post.post_excerpt()
 			};
 
 			if ( type === 'local' ) {
@@ -35,34 +36,25 @@ window.autosave = function(){};
 			});
 			data.catslist = cats.join(',');
 
-			if ( post_name = $( '#post_name' ).val() ) {
-				data.post_name = post_name;
-			}
-
-			if ( parent_id = $( '#parent_id' ).val() ) {
-				data.parent_id = parent_id;
-			}
-
-			if ( $( '#comment_status' ).prop( 'checked' ) ) {
-				data.comment_status = 'open';
-			}
-
-			if ( $( '#ping_status' ).prop( 'checked' ) ) {
-				data.ping_status = 'open';
-			}
-
-			if ( $( '#auto_draft' ).val() === '1' ) {
-				data.auto_draft = '1';
-			}
+			data.post_name = wp.fee.post.post_name();
+			data.parent_id = wp.fee.post.post_parent();
+			data.comment_status = wp.fee.post.comment_status();
+			data.ping_status = wp.fee.post.ping_status();
+			data.auto_draft = ( wp.fee.post.post_status() === 'auto-draft' );
 
 			return data;
 		}
 
 		// Concatenate title, content and excerpt. Used to track changes when auto-saving.
 		function getCompareString( postData, type ) {
+			if ( ! initialCompareString ) {
+				return initialCompareString;
+			}
+
 			if ( typeof postData === 'object' ) {
 				return ( postData.post_title || '' ) + '::' + ( postData.content || '' ) + '::' + ( postData.excerpt || '' );
 			}
+
 			return ( getPostData( type ).post_title ) + '::' + ( getPostData( type ).content ) + '::' + ( getPostData( type ).excerpt );
 		}
 
@@ -80,7 +72,7 @@ window.autosave = function(){};
 		function autosaveLocal() {
 			var restorePostData, undoPostData, blog_id, post_id, hasStorage, intervalTimer,
 				lastCompareString,
-				isSuspended = false;
+				isSuspended = true;
 
 			// Check if the browser supports sessionStorage and it's not disabled
 			function checkStorage() {
@@ -222,7 +214,7 @@ window.autosave = function(){};
 				}
 
 				postData.save_time = ( new Date() ).getTime();
-				postData.status = $( '#post_status' ).val() || '';
+				postData.status = wp.fee.post.post_status();
 				result = setData( postData );
 
 				if ( result ) {
@@ -234,7 +226,7 @@ window.autosave = function(){};
 
 			// Run on DOM ready
 			function run() {
-				post_id = $( '#post_ID' ).val() || 0;
+				post_id = wp.fee.post.ID();
 
 				// Check if the local post data is different than the loaded post data.
 				// If TinyMCE loads first, check the post 1.5 sec. after it is ready.
@@ -249,13 +241,13 @@ window.autosave = function(){};
 				// Save every 15 sec.
 				intervalTimer = window.setInterval( save, 15000 );
 
-				$( '#wp-fee-save' ).on( 'click.autosave-local', function() {
-					var post_id = $( '#post_ID' ).val() || 0;
+				$document.on( 'fee-before-save.autosave-local', function() {
+					var post_id = wp.fee.post.ID();
 
 					save( {
-						post_title: wp.fee.post.title(),
-						content: wp.fee.post.content( 'raw' ),
-						excerpt: wp.fee.post.excerpt()
+						post_title: wp.fee.post.post_title(),
+						content: wp.fee.post.post_content( 'raw' ),
+						excerpt: wp.fee.post.post_excerpt()
 					} );
 
 					wpCookies.set( 'wp-saving-post-' + post_id, 'check' );
@@ -298,13 +290,13 @@ window.autosave = function(){};
 				}
 
 				// There is a newer autosave. Don't show two "restore" notices at the same time.
-				if ( $( '#has-newer-autosave' ).length ) {
+				if ( wp.fee.notices.autosave ) {
 					return;
 				}
 
-				content = wp.fee.post.content( 'raw' );
-				post_title = wp.fee.post.title();
-				excerpt = wp.fee.post.excerpt();
+				content = wp.fee.post.post_content( 'raw' );
+				post_title = wp.fee.post.post_title();
+				excerpt = wp.fee.post.post_excerpt();
 
 				// cookie === 'check' means the post was not saved properly, always show #local-storage-notice
 				if ( cookie !== 'check' && compare( content, postData.content ) &&
@@ -342,22 +334,11 @@ window.autosave = function(){};
 
 			// Restore the current title, content and excerpt from postData.
 			function restorePost( postData ) {
-				var editor;
-
 				if ( postData ) {
 					// Set the last saved data
 					lastCompareString = getCompareString( postData );
 
-					$( '#post_title' ).val( postData.post_title || '' ).change();
-					$( '#excerpt' ).val( postData.excerpt || '' ).change();
-
-					if ( typeof tinymce !== 'undefined' ) {
-						editor = tinymce.get( 'wp-fee-content-' + wp.fee.post.id() );
-						if ( editor ) {
-							editor.undoManager.add();
-							editor.setContent( postData.content ? postData.content : '' );
-						}
-					}
+					$document.trigger( 'autosave-restore-post', postData );
 
 					return true;
 				}
@@ -393,7 +374,7 @@ window.autosave = function(){};
 		function autosaveServer() {
 			var _blockSave, _blockSaveTimer, previousCompareString, lastCompareString,
 				nextRun = 0,
-				isSuspended = false;
+				isSuspended = true;
 
 			// Block saving for the next 10 sec.
 			function tempBlockSave() {
@@ -420,13 +401,8 @@ window.autosave = function(){};
 				lastCompareString = previousCompareString;
 				previousCompareString = '';
 
-				$document.trigger( 'after-autosave', [data] );
+				$document.trigger( 'after-autosave', [ data ] );
 				enableButtons();
-
-				if ( data.success ) {
-					// No longer an auto-draft
-					$( '#auto_draft' ).val('');
-				}
 			}
 
 			/**
@@ -485,7 +461,7 @@ window.autosave = function(){};
 				$document.trigger( 'wpcountwords', [ postData.content ] )
 					.trigger( 'before-autosave', [ postData ] );
 
-				postData._wpnonce = $( '#_wpnonce' ).val() || '';
+				postData._wpnonce = wp.fee.nonces.post;
 
 				return postData;
 			}
@@ -536,8 +512,9 @@ window.autosave = function(){};
 		// then 'save' to the textarea before setting initialCompareString.
 		// This avoids any insignificant differences between the initial textarea content and the content
 		// extracted from the editor.
-		$document.on( 'tinymce-editor-init.autosave', function() {
+		$document.on( 'fee-editor-init.autosave', function() {
 			window.setTimeout( function() {
+				initialCompareString = true;
 				initialCompareString = getCompareString();
 			}, 1000 );
 		});

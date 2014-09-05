@@ -2,9 +2,9 @@
 
 Contributors: avryl, wordpressdotorg
 Tags: front-end editor, inline editing
-Requires at least: 3.8
-Tested up to: 3.9
-Stable tag: 0.10
+Requires at least: 4.0.0
+Tested up to: 4.0.0
+Stable tag: 1.0.0-beta1
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
@@ -12,14 +12,15 @@ License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
 If you found a bug or if you have ideas, add them to [the GitHub issue tracker](https://github.com/avryl/wp-front-end-editor/issues/new). We’ll also keep a list of tasks there.
 
-**Weekly IRC Chat:** Tuesdays, 17:00 UTC, [#wordpress-ui](http://codex.wordpress.org/IRC).
-
-[WordPress Plugin](http://wordpress.org/plugins/wp-front-end-editor/)  
 [GitHub](https://github.com/avryl/wp-front-end-editor)  
 [Features as Plugins Tracking](http://make.wordpress.org/core/features-as-plugins/)  
 [Make WordPress UI Posts](http://make.wordpress.org/ui/tag/front-end-editor/)
 
 == Changelog ==
+
+= 1.0.0 =
+
+*
 
 = 0.9.1 =
 
