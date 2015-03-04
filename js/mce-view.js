@@ -428,7 +428,9 @@ window.wp = window.wp || {};
 				_.bindAll( this, 'setNodes', 'fetch', 'stopPlayers' );
 				$( this ).on( 'ready', this.setNodes );
 
-				$( document ).on( 'media:edit', this.stopPlayers );
+				$( document ).on( 'media:edit', function() {
+					self.stopPlayers();
+				} );
 
 				this.fetch();
 
@@ -446,7 +448,7 @@ window.wp = window.wp || {};
 				} )
 				.done( function( response ) {
 					if ( response ) {
-						self.parsed = response;
+						self.parsed = response.body || response;
 						self.setNodes();
 					}
 				} )
